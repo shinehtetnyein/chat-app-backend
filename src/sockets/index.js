@@ -8,13 +8,15 @@ const registerReadReceiptHandlers = require('./handlers/readReceipt.handler');
 function initSocket(httpServer) {
   const clientOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
     .split(',')
-    .map((value) => value.trim())
+    .map((value) => value.trim().replace(/\/$/, ''))
     .filter(Boolean);
 
   const io = new Server(httpServer, {
     cors: {
       origin: (origin, callback) => {
-        if (!origin || clientOrigins.includes(origin)) {
+        if (!origin) return callback(null, true);
+        const normalized = origin.replace(/\/$/, '');
+        if (clientOrigins.includes(normalized) || clientOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
           callback(null, true);
           return;
         }

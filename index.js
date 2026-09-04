@@ -14,9 +14,9 @@ const app = express();
 const path = require('path');
 const fs = require('fs');
 
-const CLIENT_URLS = (process.env.CLIENT_URL || 'http://localhost:5173,http://localhost:5174')
+const clientUrls = (process.env.CLIENT_URL || '')
   .split(',')
-  .map((value) => value.trim())
+  .map((value) => value.trim().replace(/\/$/, ''))
   .filter(Boolean);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'MvPdqDWDPgYS4gkAYq0yDL+mI+e1AQwDaS0Rq+meI/A=';
@@ -26,23 +26,30 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
 const allowedOrigins = new Set([
-  ...CLIENT_URLS,
+  ...clientUrls,
+  'https://chat-app-frontend-ochre-gamma.vercel.app',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://127.0.0.1:5173',
   'http://127.0.0.1:5174',
 ]);
 
-app.use(cors({
+const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.has(origin)) {
-      callback(null, true);
-      return;
+    if (!origin) return callback(null, true);
+    const normalized = origin.replace(/\/$/, '');
+    if (allowedOrigins.has(normalized) || allowedOrigins.has(origin) || normalized.endsWith('.vercel.app')) {
+      return callback(null, true);
     }
+    console.warn(`[CORS] Blocked origin: ${origin}`);
     callback(null, false);
   },
   credentials: true,
-}));
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
