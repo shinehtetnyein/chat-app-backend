@@ -11,8 +11,16 @@ const prisma = require('./src/prisma/client');
 const { getUserSockets, getOnlineUserIds, isOnline } = require('./src/services/presence.service');
 
 const app = express();
+app.set('trust proxy', 1);
 const path = require('path');
 const fs = require('fs');
+
+const getGoogleRedirectUri = (req) => {
+  const host = req.get('host') || 'localhost:5000';
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+  const protocol = isLocal ? 'http' : 'https';
+  return `${protocol}://${host}/api/auth/google/callback`;
+};
 
 const clientUrls = (process.env.CLIENT_URL || '')
   .split(',')
@@ -65,8 +73,7 @@ app.get('/api/auth/google', (req, res) => {
     return res.status(500).json({ error: 'Google OAuth is not configured on the server.' });
   }
 
-  const backendOrigin = `${req.protocol}://${req.get('host')}`;
-  const redirectUri = `${backendOrigin}/api/auth/google/callback`;
+  const redirectUri = getGoogleRedirectUri(req);
   const requestedRedirect = req.query.redirect;
   const allowedFrontendOrigin = (() => {
     if (typeof requestedRedirect === 'string') {
@@ -80,7 +87,7 @@ app.get('/api/auth/google', (req, res) => {
       }
     }
 
-    return CLIENT_URLS[0] || 'http://localhost:5173';
+    return clientUrls[0] || 'https://chat-app-frontend-ochre-gamma.vercel.app';
   })();
 
   const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
@@ -831,7 +838,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
       }
     }
 
-    return CLIENT_URLS[0] || 'http://localhost:5173';
+    return clientUrls[0] || 'https://chat-app-frontend-ochre-gamma.vercel.app';
   })();
 
   if (!code) {
@@ -840,7 +847,7 @@ app.get('/api/auth/google/callback', async (req, res) => {
 
   try {
     // 1. Determine active server redirect URI dynamically matching the running host and port
-    const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/google/callback`;
+    const redirectUri = getGoogleRedirectUri(req);
 
     // 2. Exchange authorization code for tokens
     const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
