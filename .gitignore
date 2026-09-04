@@ -3,4 +3,5 @@
 .env.production
 .env.local
 .env.example
+dev.db
 
