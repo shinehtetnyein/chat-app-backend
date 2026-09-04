@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String
+  passwordHash String?
+  avatarUrl    String?
+  provider     String       @default("local")
+  isOnline     Boolean      @default(false)
+  lastSeenAt   DateTime?
+  createdAt    DateTime     @default(now())
+  memberships  Membership[]
+  messages     Message[]
+  readReceipts ReadReceipt[]
+}
+
+model Room {
+  id          String       @id @default(cuid())
+  name        String
+  type        String       @default("channel")
+  createdAt   DateTime     @default(now())
+  memberships Membership[]
+  messages    Message[]
+}
+
+model Membership {
+  id     String @id @default(cuid())
+  userId String
+  roomId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roomId])
+}
+
+model Message {
+  id            String        @id @default(cuid())
+  roomId        String
+  senderId      String
+  content       String
+  attachmentUrl String?
+  replyTo       String?
+  forwardedFrom String?
+  isForwarded   Boolean       @default(false)
+  isEdited      Boolean       @default(false)
+  isPinned      Boolean       @default(false)
+  isDeleted     Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  room          Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender        User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  readReceipts  ReadReceipt[]
+}
+
+model ReadReceipt {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  readAt    DateTime
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId], name: "messageId_userId")
+}
