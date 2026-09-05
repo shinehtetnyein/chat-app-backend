@@ -1,12 +1,14 @@
 const jwt = require('jsonwebtoken');
 
+const JWT_SECRET = process.env.JWT_SECRET || 'MvPdqDWDPgYS4gkAYq0yDL+mI+e1AQwDaS0Rq+meI/A=';
+
 /**
  * Verifies a JWT and returns its decoded payload, or null if invalid/expired.
  */
 function verifyToken(token) {
   if (!token) return null;
   try {
-    return jwt.verify(token, process.env.JWT_SECRET);
+    return jwt.verify(token, JWT_SECRET);
   } catch (err) {
     return null;
   }

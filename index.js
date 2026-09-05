@@ -180,14 +180,24 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.get('/api/me/rooms', async (req, res) => {
+function authenticateToken(req, res, next) {
   const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : req.cookies?.token;
 
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
   try {
     const payload = jwt.verify(token, JWT_SECRET);
+    req.user = payload;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+}
+
+app.get('/api/me/rooms', authenticateToken, async (req, res) => {
+  try {
+    const payload = req.user;
     const memberships = await prisma.membership.findMany({
       where: { userId: payload.id },
       include: {
@@ -266,18 +276,14 @@ app.get('/api/me/rooms', async (req, res) => {
 
     res.json({ rooms });
   } catch (error) {
-    res.status(401).json({ error: 'Invalid token' });
+    console.error('Fetch rooms failed:', error);
+    res.status(500).json({ error: 'Failed to load rooms' });
   }
 });
 
-app.post('/api/rooms', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
+app.post('/api/rooms', authenticateToken, async (req, res) => {
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = req.user;
     const { name, type = 'channel', userIds = [] } = req.body || {};
 
     if (!name?.trim()) return res.status(400).json({ error: 'Room name is required.' });
@@ -335,14 +341,9 @@ app.post('/api/rooms', async (req, res) => {
   }
 });
 
-app.get('/api/users', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
+app.get('/api/users', authenticateToken, async (req, res) => {
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = req.user;
     const users = await prisma.user.findMany({
       where: {
         id: { not: payload.id },
@@ -373,14 +374,9 @@ app.get('/api/users', async (req, res) => {
 });
 
 // Update signed-in user's own profile
-app.patch('/api/users/me', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
+app.patch('/api/users/me', authenticateToken, async (req, res) => {
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = req.user;
     const { name, avatarUrl } = req.body || {};
 
     const updateData = {};
@@ -399,14 +395,9 @@ app.patch('/api/users/me', async (req, res) => {
   }
 });
 
-app.get('/api/rooms/:roomId/messages', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
+app.get('/api/rooms/:roomId/messages', authenticateToken, async (req, res) => {
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = req.user;
     const roomId = req.params.roomId;
 
     const membership = await prisma.membership.findFirst({
@@ -428,14 +419,9 @@ app.get('/api/rooms/:roomId/messages', async (req, res) => {
   }
 });
 
-app.post('/api/rooms/:roomId/read', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
+app.post('/api/rooms/:roomId/read', authenticateToken, async (req, res) => {
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = req.user;
     const roomId = req.params.roomId;
 
     const unreadMessages = await prisma.message.findMany({
@@ -484,14 +470,9 @@ app.post('/api/rooms/:roomId/read', async (req, res) => {
   }
 });
 
-app.post('/api/rooms/:roomId/messages', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
+app.post('/api/rooms/:roomId/messages', authenticateToken, async (req, res) => {
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = req.user;
     const roomId = req.params.roomId;
     const { content, attachmentUrl, replyTo, forwardedFrom, isForwarded } = req.body || {};
 
@@ -535,14 +516,9 @@ app.post('/api/rooms/:roomId/messages', async (req, res) => {
   }
 });
 
-app.delete('/api/messages/:messageId', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
+app.delete('/api/messages/:messageId', authenticateToken, async (req, res) => {
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = req.user;
     const { messageId } = req.params;
 
     const message = await prisma.message.findUnique({
@@ -584,14 +560,9 @@ app.delete('/api/messages/:messageId', async (req, res) => {
   }
 });
 
-app.patch('/api/messages/:messageId', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
+app.patch('/api/messages/:messageId', authenticateToken, async (req, res) => {
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = req.user;
     const { messageId } = req.params;
     const { content } = req.body || {};
 
@@ -635,14 +606,9 @@ app.patch('/api/messages/:messageId', async (req, res) => {
   }
 });
 
-app.patch('/api/messages/:messageId/pin', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-
-  if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
+app.patch('/api/messages/:messageId/pin', authenticateToken, async (req, res) => {
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
+    const payload = req.user;
     const { messageId } = req.params;
     const { isPinned } = req.body || {};
 
